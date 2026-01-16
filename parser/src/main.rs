@@ -35,15 +35,27 @@ enum TokenType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+enum Expr {
+  Number(i64),
+  Identifier(String),
+  Binary {
+    left: Box<Expr>,
+    op: TokenType,
+    right: Box<Expr>,
+  },
+}
+
+#[derive(Debug, Clone, PartialEq)]
 enum Statement {
   Let {
     name: String,
-    value: String,
+    value: Expr,
   },
   Print {
-    value: String,
+    value: Expr,
   }
 }
+
 
 fn main() {
 
@@ -269,16 +281,34 @@ fn main() {
       }
     }
 
+    fn parse_expr(&mut self) -> Option<Expr> {
+      let tok = self.current()?;
+
+      match tok.token_type {
+        TokenType::Number => {
+          let val = tok.literal.parse().ok()?;
+          self.next();
+          Some(Expr::Number(val))
+        },
+        TokenType::Identifier => {
+          let val = tok.literal.clone();
+          self.next();
+          Some(Expr::Identifier(val))
+        }
+        _ => None
+      }
+    }
+
     fn parse_let(&mut self) -> Option<Statement> {
       self.next()?; // let
 
       let name = self.current()?.literal.clone();
-      self.next()?; // identifier
+
+      self.next()?; // Number
 
       self.next()?; // =
 
-      let value = self.current()?.literal.clone();
-      self.next()?; // number
+      let value = self.parse_expr()?;
 
       self.next()?; // ;
 
@@ -290,8 +320,7 @@ fn main() {
 
       self.next()?; // (
 
-      let value = self.current()?.literal.clone();
-      self.next()?; // value
+      let value = self.parse_expr()?;
 
       self.next()?; // )
 
@@ -305,10 +334,29 @@ fn main() {
   // ! I HAVENT EVEN COMMITED SINCE I DID THE PARSER
   // ? Which for the memo is in the end of the script
 
+  fn eval_expr(expr: Expr, env: &HashMap<String, i64>) -> i64 {
+    match expr {
+      Expr::Number(n) => n,
+      Expr::Identifier(name) => *env.get(&name).expect("Undefined variable"),
+      Expr::Binary { left, op, right } => {
+        let l = eval_expr(*left, env);
+        let r = eval_expr(*right, env);
+
+        match op {
+            TokenType::Plus => l + r,
+            TokenType::Minus => l - r,
+            TokenType::Star => l * r,
+            TokenType::Slash => l / r,
+            _ => panic!("Operator does not exist"),
+        }
+      }
+    }
+  }
+
 
   // ! START TESTING THE LEXER FUNCS FINALLY I THINK
   
-  let my_code: &str = "let var = 20; let bro_it_works = 10; print(var); print(bro_it_works);";
+  let my_code: &str = "let var = 20; let bro_it_works = var; print(5); print(bro_it_works);";
   let mut lexer: Lexer<'_> = Lexer::new(my_code);
   let mut tokens: Vec<_> = Vec::new();
   println!("Code to interpret: {}", my_code);
@@ -335,10 +383,12 @@ fn main() {
     
       match stmt {
         Statement::Let { name, value } => {
-          env.insert(name, value.parse::<i64>().unwrap());
+          let val = eval_expr(value, &env);
+          env.insert(name, val);
         },
         Statement::Print { value } => {
-          println!("{}", env.get(&value).unwrap()); // ! IT WORKS CHARLIE KIRK WOULD BE PROUD OF ME
+          let val = eval_expr(value, &env);
+          println!("{}", val); // ! IT WORKS CHARLIE KIRK WOULD BE PROUD OF ME
         }
       }
   }
