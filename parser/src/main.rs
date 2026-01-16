@@ -34,7 +34,20 @@ enum TokenType {
   EOF,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum Statement {
+  Let {
+    name: String,
+    value: String,
+  },
+  Print {
+    value: String,
+  }
+}
+
 fn main() {
+
+  // ! Lexer or sum idk Im not that good at rust
 
   #[derive(Debug)]
   struct Token {
@@ -160,6 +173,18 @@ fn main() {
           literal: ";".to_string(),
         },
 
+        //* Case ( */
+        Some('(') => Token {
+          token_type: TokenType::LeftParen,
+          literal: "(".to_string(),
+        },
+
+        //* Case ) */
+        Some(')') => Token {
+          token_type: TokenType::RightParen,
+          literal: ")".to_string(),
+        },
+
         //* Case EOF */
         None => Token {
           token_type: TokenType::EOF,
@@ -208,21 +233,113 @@ fn main() {
     c.is_alphabetic() || c == '_'
   }
 
-  let my_code: &str = "let a = 5;";
 
+
+  // ! PARSER STUFF LET'S FUCKING GO STEP 2 OUT OF 3 IM SO GOATED
+  
+  struct Parser {
+    tokens: Vec<Token>,
+    pos: usize,
+  }
+
+  impl Parser {
+    fn new(tokens: Vec<Token>) -> Self {
+      Parser { tokens, pos: 0 }
+    }
+
+    fn current(&self) -> Option<&Token> {
+      self.tokens.get(self.pos)
+    }
+
+    fn next(&mut self) -> Option<&Token> {
+      let tok = self.tokens.get(self.pos);
+      self.pos += 1;
+      tok
+    }
+  
+    fn parse_statement(&mut self) -> Option<Statement> {
+      match self.current()?.token_type {
+        TokenType::Declare => self.parse_let(),
+        TokenType::Print => self.parse_print(),
+        TokenType::EOF => None,
+        _=> {
+          self.next();
+          None
+        }
+      }
+    }
+
+    fn parse_let(&mut self) -> Option<Statement> {
+      self.next()?; // let
+
+      let name = self.current()?.literal.clone();
+      self.next()?; // identifier
+
+      self.next()?; // =
+
+      let value = self.current()?.literal.clone();
+      self.next()?; // number
+
+      self.next()?; // ;
+
+      Some(Statement::Let { name, value })
+    }
+
+    fn parse_print(&mut self) -> Option<Statement> {
+      self.next()?; // print
+
+      self.next()?; // (
+
+      let value = self.current()?.literal.clone();
+      self.next()?; // value
+
+      self.next()?; // )
+
+      self.next()?; // ;
+
+      Some(Statement::Print { value })
+    }
+  }
+
+  // ! YO LET'S FUCKING GO NOW I JUST NEED THE EVALUATOR
+  // ! I HAVENT EVEN COMMITED SINCE I DID THE PARSER
+  // ? Which for the memo is in the end of the script
+
+
+  // ! START TESTING THE LEXER FUNCS FINALLY I THINK
+  
+  let my_code: &str = "let var = 20; let bro_it_works = 10; print(var); print(bro_it_works);";
   let mut lexer: Lexer<'_> = Lexer::new(my_code);
-
-
-
-
-
-  // START TESTING THE LEXER FUNCS FINALLY I THINK
+  let mut tokens: Vec<_> = Vec::new();
+  println!("Code to interpret: {}", my_code);
   loop {
     let tok = lexer.next_token(&keywords);
-    println!("{:?}", tok);
-
+    //? println!("{:?}", tok);
+    
     if tok.token_type == TokenType::EOF {
+      tokens.push(tok);
       break;
     }
+    tokens.push(tok);
+  }
+  
+  // ! Parser type shit
+  let mut parser: Parser = Parser::new(tokens);
+  let mut statements: Vec<_> = Vec::new();
+  let mut env: HashMap<String, i64> = HashMap::new();
+
+  while let Some(stmt) = parser.parse_statement() {
+    statements.push(stmt.clone());
+    
+      // ! Evaluator type shit
+    
+      match stmt {
+        Statement::Let { name, value } => {
+          env.insert(name, value.parse::<i64>().unwrap());
+        },
+        Statement::Print { value } => {
+          println!("{}", env.get(&value).unwrap()); // ! IT WORKS CHARLIE KIRK WOULD BE PROUD OF ME
+        }
+      }
   }
 }
